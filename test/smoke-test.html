@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Teste - Recipe App</title>
+  <style>
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 16px; }
+    .ok { color: #137333; }
+    .fail { color: #b31412; }
+    .case { margin: 8px 0; }
+  </style>
+</head>
+<body>
+  <h1>Teste rápido do Recipe App</h1>
+  <p>Este arquivo faz um smoke test do fluxo básico usando mocks.</p>
+
+  <!-- Mock mínimo do Bootstrap Modal usado no script -->
+  <script>
+    window.bootstrap = {
+      Modal: class {
+        constructor(el) { this.el = el; }
+        show() { this.el.setAttribute('data-open', 'true'); }
+        hide() { this.el.removeAttribute('data-open'); }
+      }
+    };
+  </script>
+
+  <!-- Estrutura mínima esperada pelo app -->
+  <nav></nav>
+  <div class="container my-5">
+    <form id="search-form"><input id="search-input" value="chicken" /></form>
+    <button id="random-recipe-btn">Rand</button>
+    <h2 id="results-heading"></h2>
+    <div id="results-area" class="row g-4"></div>
+    <div id="feedback-area"><p class="lead text-muted"></p></div>
+  </div>
+
+  <div class="modal fade" id="recipeModal">
+    <div class="modal-dialog"><div class="modal-content">
+      <div class="modal-header"><h5 class="modal-title"></h5></div>
+      <div class="modal-body"></div>
+    </div></div>
+  </div>
+
+  <script>
+    // Mock de fetch para API do TheMealDB
+    const SAMPLE_MEALS = [{
+      idMeal: '12345',
+      strMeal: 'Mock Chicken',
+      strMealThumb: 'https://via.placeholder.com/400x300?text=Mock+Chicken',
+      strInstructions: 'Step 1. Do this.\nStep 2. Do that.',
+      strYoutube: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+      strIngredient1: 'Chicken', strMeasure1: '300g',
+      strIngredient2: 'Salt', strMeasure2: '1 tsp',
+      strIngredient3: '', strMeasure3: ''
+    }];
+
+    const realFetch = window.fetch;
+    window.fetch = async (url) => {
+      if (typeof url === 'string' && url.includes('themealdb.com/api/json/v1/1/')) {
+        if (url.includes('search.php')) {
+          return new Response(JSON.stringify({ meals: SAMPLE_MEALS }), { status: 200 });
+        }
+        if (url.includes('random.php')) {
+          return new Response(JSON.stringify({ meals: SAMPLE_MEALS }), { status: 200 });
+        }
+        if (url.includes('lookup.php')) {
+          return new Response(JSON.stringify({ meals: SAMPLE_MEALS }), { status: 200 });
+        }
+        return new Response(JSON.stringify({ meals: null }), { status: 200 });
+      }
+      return realFetch(url);
+    };
+
+    // Utilitário simples de asserção
+    function assert(condition, msg) {
+      const p = document.createElement('p');
+      p.className = 'case ' + (condition ? 'ok' : 'fail');
+      p.textContent = (condition ? 'OK: ' : 'FAIL: ') + msg;
+      document.body.appendChild(p);
+    }
+  </script>
+
+  <!-- Carrega o script real do app -->
+  <script src="../recipe_script.js"></script>
+
+  <script>
+    // Após carregado, executa smoke tests
+    window.addEventListener('load', () => {
+      const resultsArea = document.getElementById('results-area');
+      const feedback = document.querySelector('#feedback-area p');
+
+      // Aguardar render inicial do getRandomRecipe
+      setTimeout(() => {
+        assert(resultsArea.children.length > 0, 'Cards renderizados no carregamento inicial');
+        const card = resultsArea.querySelector('.recipe-card');
+        assert(!!card, 'Primeiro card existe');
+
+        // Abre modal de detalhes
+        card.click();
+        setTimeout(() => {
+          const modal = document.getElementById('recipeModal');
+          const opened = modal.getAttribute('data-open') === 'true';
+          assert(opened, 'Modal foi aberto');
+          const bodyHtml = modal.querySelector('.modal-body').innerHTML;
+          assert(bodyHtml.includes('Ingredientes') && bodyHtml.includes('Instruções'), 'Conteúdo do modal contém ingredientes e instruções');
+
+          // Executa uma busca
+          document.getElementById('search-input').value = 'beef';
+          document.getElementById('search-form').dispatchEvent(new Event('submit'));
+          setTimeout(() => {
+            assert(resultsArea.children.length > 0, 'Cards renderizados após busca');
+            assert(feedback.textContent === '' || feedback.textContent === 'Nenhuma receita encontrada. Tente outra busca.', 'Feedback coerente');
+          }, 300);
+        }, 300);
+      }, 400);
+    });
+  </script>
+</body>
+</html>
